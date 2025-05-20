@@ -1,0 +1,54 @@
+{
+  "name": "extract2md",
+  "version": "1.0.0",
+  "description": "Client-side PDF to Markdown conversion with OCR and optional LLM rewrite. Core dependencies bundled for offline use.",
+  "main": "dist/assets/extract2md.umd.js",
+  "module": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "webpack",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "pdf",
+    "markdown",
+    "ocr",
+    "tesseract.js",
+    "pdf.js",
+    "webllm",
+    "llm",
+    "client-side",
+    "text-extraction",
+    "pdf to markdown",
+    "offline"
+  ],
+  "author": "Hashan Wickramasinghe <hashanwickramasinghe@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.79",
+    "pdfjs-dist": "^5.2.133",
+    "tesseract.js": "^5.0.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-env": "^7.24.0",
+    "babel-loader": "^9.1.3",
+    "copy-webpack-plugin": "^12.0.2",
+    "webpack": "^5.90.3",
+    "webpack-cli": "^5.1.4"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "homepage": "https://github.com/yourusername/extract2md#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/extract2md.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/client-pdf-to-md/issues"
+  }
+}
