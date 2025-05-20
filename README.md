@@ -221,39 +221,9 @@ await converter.llmRewrite(text, {
 
 ## Supported languages by the highAccuracyConvert()
 (Language codes are typically ISO 639-2/T or ISO 639-3. Check Tesseract.js documentation. **All language data files listed here are bundled with the package.**)
-Arabic - tesseractLanguage: 'ara'
-Chinese - Simplified - tesseractLanguage: 'chi_sim'
-Chinese - Traditional - tesseractLanguage: 'chi_tra'
-Danish - tesseractLanguage: 'dan'
-Dutch - tesseractLanguage: 'nld'
 English - tesseractLanguage: 'eng'
-Finnish - tesseractLanguage: 'fin'
-French - tesseractLanguage: 'fra'
-German - tesseractLanguage: 'deu'
-Hindi - tesseractLanguage: 'hin'
-Irish - tesseractLanguage: 'gle'
-Italian - tesseractLanguage: 'ita'
-Indonesian - tesseractLanguage: 'ind'
-Javanese - tesseractLanguage: 'jav'
-Japanese - tesseractLanguage: 'jpn'
-Korean - tesseractLanguage; 'kor'
-Malay - tesseractLanguage: 'msa'
-Marathi - tesseractLanguage: 'mar'
-Norwegian - tesseractLanguage: 'nor
-Portuguese - tesseractLanguage: 'por'
-Russian - tesseractLanguage: 'rus'
 Sinhala - tesseractLanguage: 'sin'
-Spanish - tesseractLanguage: 'spa'
-Swedish - tesseractLanguage: 'swe'
-Tagalog - tesseractLanguage: 'tgl'
-Telugu - tesseractLanguage: 'tel'
-Thai - tesseractLanguage: 'tha'
-Tamil - tesseractLanguage: 'tam'
-Turkish - tesseractLanguage: 'tur'
-Ukrainian - tesseractLanguage: 'ukr'
-Urdu - tesseractLanguage: 'urd'
-Vietnamese - tesseractLanguage: 'vie'
-Welsh - tesseractLanguage: 'cym'
+
 
 ## Building the Library (For Maintainers)
 1. Ensure you have a `lang-data` folder at the project root containing **all** `*.traineddata.gz` files for the languages you want to bundle and list as supported.
