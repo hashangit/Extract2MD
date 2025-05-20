@@ -43,12 +43,12 @@
     "src",
     "README.md"
   ],
-  "homepage": "https://github.com/yourusername/extract2md#readme",
+  "homepage": "https://github.com/hashangit/Extract2MD#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/extract2md.git"
+    "url": "git+https://github.com/hashangit/Extract2MD.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/client-pdf-to-md/issues"
+    "url": "https://github.com/hashangit/Extract2MD/issues"
   }
 }
