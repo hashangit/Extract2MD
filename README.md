@@ -150,7 +150,8 @@ const converter = new Extract2MDConverter({
     ],
 
     // --- LLM Configuration ---
-    llmModel: 'Qwen3-0.6B-q4f16_0-MLC', // Default model for llmRewrite
+    llmModel: 'Qwen3-0.6B-q4f16_1-MLC', // Default model for llmRewrite
+    // llmModelLibUrl: 'FULL_URL_TO_YOUR_MODEL_WASM_LIBRARY', // Required if llmModel is not the default and WebLLM cannot auto-resolve, or to override the default.
     // llmPromptTemplate: (text) => `Summarize this: ${text}`, // Custom prompt
 
     // --- General Configuration ---
@@ -249,9 +250,9 @@ The default prompt is:
 
 -   `textToRewrite`: The string of text to be rewritten.
 -   `options` (optional):
-    -   `llmModel`: (String, default: `'Qwen3-0.6B-q4f16_0-MLC'`) The ID of the WebLLM model to use.
+    -   `llmModel`: (String, default: `'Qwen3-0.6B-q4f16_1-MLC'`) The ID of the WebLLM model to use. If you use a custom model ID, you typically also need to provide `llmModelLibUrl` in the constructor.
     -   `llmPromptTemplate`: (Function or String) A template for the LLM prompt. If a function, it receives the `textToRewrite` as an argument and should return the full prompt string. If a string, `${text}` will be replaced with `textToRewrite`.
-    -   `chatOpts`: (Object) Configuration options passed directly to WebLLM's `ChatModule.reload()` or `ChatRestModule.reload()` method, useful for specifying custom model lists or other advanced WebLLM settings.
+    -   `chatOpts`: (Object) Advanced configuration options passed directly to WebLLM's engine initialization. Use this for complex scenarios like providing a full custom `appConfig`. For simply setting a custom model library URL, prefer the `llmModelLibUrl` constructor option.
 
 **Example:**
 ```javascript
@@ -312,33 +313,30 @@ The WebLLM engine JavaScript (`web-llm.js`) is bundled with `extract2md`. Howeve
 
 *   **Strategy 2: Application-Managed Local Models (Full Offline Control)**
     -   For robust offline LLM functionality without relying on initial CDN downloads, you can package the LLM model artifacts directly with your application and instruct WebLLM to load them from your local paths.
-    -   Download the desired model artifacts (e.g., from [MLC LLM's Hugging Face repositories](https://huggingface.co/mlc-ai)). You'll typically need the `mlc-chat-config.json`, the model weights file (e.g., `*.wasm`), and potentially other configuration files.
-    -   Serve these files from your application (e.g., under `/app-assets/llm-models/YourModelName/`).
-    -   Configure `Extract2MDConverter` using the `chatOpts` parameter to point WebLLM to your local model:
+    -   **Step 1: Obtain Model Artifacts:**
+        -   Download the desired model artifacts (e.g., from [MLC LLM's Hugging Face repositories](https://huggingface.co/mlc-ai)). You'll need the directory containing `mlc-chat-config.json`, tokenizer files, etc.
+        -   Obtain the specific WebAssembly model library (`.wasm` file) for your chosen model and version. This is crucial.
+    -   **Step 2: Host Artifacts:**
+        -   Serve the model directory (containing `mlc-chat-config.json` etc.) from your application (e.g., under `/app-assets/llm-models/YourModelName/`).
+        -   Serve the `.wasm` model library file from your application (e.g., `/app-assets/llm-libs/your-model.wasm`).
+    -   **Step 3: Configure `Extract2MDConverter`:**
+        Use the `llmModel` and `llmModelLibUrl` constructor options:
         ```javascript
-        const myCustomModelId = 'MyLocalQwenModel';
-        await converter.llmRewrite(textToRewrite, {
-            llmModel: myCustomModelId, // Use your custom ID
-            chatOpts: {
-                // This structure is passed to WebLLM's ChatModule.reload()
-                appConfig: {
-                    model_list: [
-                        {
-                            "model_id": myCustomModelId,
-                            // URL to your locally hosted mlc-chat-config.json for this model
-                            "model_url": "/app-assets/llm-models/Qwen3-0.6B-q4f16_0-MLC/mlc-chat-config.json",
-                            // URL to your locally hosted model library (WASM file)
-                            "model_lib_url": "/app-assets/llm-models/Qwen3-0.6B-q4f16_0-MLC/Qwen3-0.6B-q4f16_0-MLC-webgpu.wasm",
-                        },
-                        // ... you can list other locally hosted models here
-                    ],
-                    // Optionally, specify a different base URL for model artifacts if not relative
-                    // "model_lib_map": { /* ... */ }
-                }
-            }
+        const myCustomModelId = 'MyLocalQwenModel'; // e.g., 'Qwen3-0.6B-q4f16_0-MLC'
+        const converter = new Extract2MDConverter({
+            llmModel: myCustomModelId,
+            llmModelLibUrl: '/app-assets/llm-libs/Qwen3-0.6B-q4f16_0-ctx4k_cs1k-webgpu.wasm', // Exact URL to your hosted WASM
+            // ... other options
         });
+
+        // Then, when calling llmRewrite, it will use these settings.
+        // The 'model' URL for WebLLM's appConfig will be constructed based on llmModel.
+        // For full control over WebLLM's appConfig, you can still use the chatOpts parameter
+        // in llmRewrite, but llmModelLibUrl is simpler for just specifying the library.
+        await converter.llmRewrite(textToRewrite);
         ```
-    Refer to the [WebLLM documentation](https://llm.mlc.ai/docs/deploy/javascript.html) for detailed information on `appConfig` and local model hosting.
+    -   The library will construct an `appConfig` for WebLLM using the `llmModel` to derive the Hugging Face URL (for `mlc-chat-config.json` etc.) and the `llmModelLibUrl` directly for the WASM library.
+    -   Refer to the [WebLLM documentation](https://llm.mlc.ai/docs/deploy/javascript.html) for more advanced `appConfig` structures if needed (which can be passed via `chatOpts` in `llmRewrite`).
 
 ## Configuration Options
 
@@ -356,7 +354,8 @@ Passed when creating an `Extract2MDConverter` instance:
 | `tesseractOptions`    | `Object`   | `{}`                                          | Advanced options passed directly to Tesseract.js `createWorker`.                                                                          |
 | `splitPascalCase`     | `Boolean`  | `false`                                       | If `true`, enables heuristic splitting of `PascalCaseText` and `camelCaseText` during post-processing.                                  |
 | `postProcessRules`    | `Array`    | `[]`                                          | Array of custom post-processing rules ( `{ find: RegExp, replace: String }`). Applied after default rules.                               |
-| `llmModel`            | `String`   | `'Qwen3-0.6B-q4f16_0-MLC'`                    | Default WebLLM model ID for `llmRewrite()`.                                                                                               |
+| `llmModel`            | `String`   | `'Qwen3-0.6B-q4f16_1-MLC'`                    | Default WebLLM model ID for `llmRewrite()`.                                                                                               |
+| `llmModelLibUrl`      | `String`   | `null`                                        | Optional. Full URL to the WebAssembly (.wasm) model library. Required if `llmModel` is specified and is not the default, or if overriding the default model's library. |
 | `llmPromptTemplate`   | `Function` or `String` | (Default internal prompt)         | Template for LLM rewrite prompts. See `llmRewrite()` method description.                                                                  |
 | `progressCallback`    | `Function` | `(progressInfo) => {}`                        | Callback function for progress updates. Receives `progressInfo` object: `{ stage: String, message: String, progress?: Number (0-1) }`. |
 

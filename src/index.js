@@ -7,13 +7,15 @@
 
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import Tesseract from 'tesseract.js';
-import { Chat as ImportedChat } from '@mlc-ai/web-llm';
+import { Chat as ImportedChat, CreateMLCEngine as ImportedCreateMLCEngine } from '@mlc-ai/web-llm';
+import * as webllm from '@mlc-ai/web-llm'; // Import the full module
 
 const DEFAULT_PDFJS_WORKER_SRC = '../pdf.worker.min.mjs'; // Relative to dist/assets/
 const DEFAULT_TESSERACT_WORKER_PATH = './tesseract-worker.min.js'; // Relative to dist/assets/
 const DEFAULT_TESSERACT_CORE_PATH = './tesseract-core.wasm.js';   // Relative to dist/assets/
 const DEFAULT_TESSERACT_LANG_PATH = './lang-data/';             // Relative to dist/assets/
-const DEFAULT_LLM_MODEL = 'Qwen3-0.6B-q4f16_0-MLC';
+const DEFAULT_LLM_MODEL = 'Qwen3-0.6B-q4f16_1-MLC'; // Updated to match available WASM
+const DEFAULT_LLM_MODEL_LIB_URL = 'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/Qwen3-0.6B-q4f16_1-ctx4k_cs1k-webgpu.wasm';
 
 class Extract2MDConverter {
     constructor(options = {}) {
@@ -58,20 +60,39 @@ class Extract2MDConverter {
         this.customPostProcessRules = options.postProcessRules || [];
 
         this.llmModel = options.llmModel || DEFAULT_LLM_MODEL;
+        this.llmModelLibUrl = options.llmModelLibUrl || null; // New option for user-specified model_lib
         this.chatModule = null;
         this.llmInitialized = false;
         
         this.progressCallback = options.progressCallback || function(progress) { /* console.log(progress) */ };
 
-        this.WebLLMChatConstructor = null;
-        if (typeof ImportedChat !== 'undefined') {
-            this.WebLLMChatConstructor = ImportedChat;
-        } else if (typeof window !== 'undefined' && window.webLLM && typeof window.webLLM.Chat === 'function') {
+        this.WebLLMChatConstructor = null; // For fallback
+        this.WebLLMCreateEngine = null;
+        this.webllmModule = null;
+
+        // Try to get the full webllm module for modelLibURLPrefix and modelVersion
+        if (typeof webllm !== 'undefined' && webllm.CreateMLCEngine) {
+            this.webllmModule = webllm;
+            this.WebLLMCreateEngine = webllm.CreateMLCEngine;
+            this.WebLLMChatConstructor = webllm.Chat; // Also get Chat from the main module
+        } else if (typeof window !== 'undefined' && window.webLLM && typeof window.webLLM.CreateMLCEngine === 'function') {
+            this.webllmModule = window.webLLM;
+            this.WebLLMCreateEngine = window.webLLM.CreateMLCEngine;
             this.WebLLMChatConstructor = window.webLLM.Chat;
-        } else if (typeof window !== 'undefined' && typeof window.ChatModule === 'function') {
-            // Fallback for older global name, though the import error suggests ChatModule is gone
-            console.warn('WebLLM global `ChatModule` is deprecated, prefer `webLLM.Chat`.');
-            this.WebLLMChatConstructor = window.ChatModule;
+        } else {
+             // Fallback if full module import didn't work as expected, try individual imports
+            console.warn('Extract2MD_Debug: Full webllm module not found, relying on individual imports/globals for CreateMLCEngine/Chat.');
+            if (typeof ImportedCreateMLCEngine !== 'undefined') {
+                this.WebLLMCreateEngine = ImportedCreateMLCEngine;
+            } else if (typeof window !== 'undefined' && window.webLLM && typeof window.webLLM.CreateMLCEngine === 'function') { // Redundant but safe
+                this.WebLLMCreateEngine = window.webLLM.CreateMLCEngine;
+            }
+            // Fallback for Chat constructor
+            if (typeof ImportedChat !== 'undefined') {
+                this.WebLLMChatConstructor = ImportedChat;
+            } else if (typeof window !== 'undefined' && window.webLLM && typeof window.webLLM.Chat === 'function') { // Redundant
+                this.WebLLMChatConstructor = window.webLLM.Chat;
+            }
         }
     }
 
@@ -286,23 +307,26 @@ class Extract2MDConverter {
     }
 
     async _initializeLLM(modelId, chatOpts = {}) {
-        if (!this.WebLLMChatConstructor) { 
-            throw new Error('WebLLM Chat module is not loaded. Ensure @mlc-ai/web-llm is correctly imported and bundled, or webLLM.Chat is globally available.');
+        if (!this.WebLLMCreateEngine && !this.WebLLMChatConstructor) {
+            throw new Error('WebLLM (CreateMLCEngine or Chat) module is not loaded. Ensure @mlc-ai/web-llm is correctly imported/bundled, or webLLM is globally available.');
         }
 
-        if (this.llmInitialized && this.chatModule && this.chatModule.modelId === modelId) {
+        // Check if LLM is already initialized with the same model.
+        // For CreateMLCEngine, modelId is part of the engine. For Chat, we stored it.
+        const currentModelId = this.chatModule ? (this.chatModule.modelId || (this.chatModule.config && this.chatModule.config.model_id)) : null;
+        if (this.llmInitialized && this.chatModule && currentModelId === modelId) {
             this.progressCallback({ stage: 'llm_ready', message: 'LLM already initialized with the correct model.' });
             return;
         }
 
         this.progressCallback({ stage: 'llm_init', message: `Initializing LLM with model: ${modelId}... This may take time.` });
         
-        if (this.chatModule) {
+        if (this.chatModule && typeof this.chatModule.unload === 'function') {
             await this.chatModule.unload();
+            this.chatModule = null; // Ensure it's cleared
         }
+        this.llmInitialized = false;
 
-        this.chatModule = new this.WebLLMChatConstructor();
-        this.chatModule.modelId = modelId; 
 
         const llmInitProgressCallback = report => {
             this.progressCallback({
@@ -313,11 +337,64 @@ class Extract2MDConverter {
         };
 
         try {
-            const finalChatOpts = {
-                ...chatOpts,
-                initProgressCallback: llmInitProgressCallback
-            };
-            await this.chatModule.reload(modelId, finalChatOpts);
+            if (this.WebLLMCreateEngine) {
+                let modelLibToUse;
+
+                if (this.llmModelLibUrl) {
+                    // User provided a specific model_lib URL
+                    modelLibToUse = this.llmModelLibUrl;
+                } else if (modelId === DEFAULT_LLM_MODEL) {
+                    // Use the hardcoded default model_lib URL for the default model
+                    modelLibToUse = DEFAULT_LLM_MODEL_LIB_URL;
+                } else {
+                    // No specific URL provided by user, and it's not the default model with a known URL
+                    throw new Error(
+                        `Extract2MD Error: 'model_lib' URL not specified for model '${modelId}'. ` +
+                        `Please provide it via the 'llmModelLibUrl' constructor option, ` +
+                        `or use the default model ('${DEFAULT_LLM_MODEL}').`
+                    );
+                }
+                
+                const appConfig = {
+                    model_list: [
+                        {
+                            "model": `https://huggingface.co/mlc-ai/${modelId}/resolve/main/`,
+                            "model_id": modelId,
+                            "model_lib": modelLibToUse,
+                            "required_features": modelId.includes("f16") ? ["shader-f16"] : [],
+                            "overrides": {
+                                "conv_template": "qwen"
+                            }
+                        }
+                    ]
+                };
+
+                const engineConfig = {
+                    ...chatOpts,
+                    initProgressCallback: llmInitProgressCallback,
+                    appConfig: appConfig // Pass the constructed appConfig
+                };
+                this.chatModule = await this.WebLLMCreateEngine(modelId, engineConfig);
+                // CreateMLCEngine loads the model, so no separate reload needed immediately.
+                // We can store modelId if needed for future checks, though engine usually has it.
+                if(this.chatModule) this.chatModule.modelId = modelId; // For consistency if checked later
+            } else if (this.WebLLMChatConstructor) {
+                // Fallback to Chat constructor - this is the path that had issues
+                this.chatModule = new this.WebLLMChatConstructor();
+                if(this.chatModule) this.chatModule.modelId = modelId; // Store modelId for Chat instances
+                
+                const finalChatOpts = {
+                    ...chatOpts,
+                    initProgressCallback: llmInitProgressCallback
+                };
+                if (typeof this.chatModule.reload !== 'function') {
+                    throw new Error('this.chatModule.reload is not a function (Chat fallback path).');
+                }
+                await this.chatModule.reload(modelId, finalChatOpts);
+            } else {
+                 throw new Error('No valid WebLLM constructor found.');
+            }
+            
             this.llmInitialized = true;
             this.progressCallback({ stage: 'llm_init_complete', message: 'LLM initialized successfully.' });
         } catch (err) {
@@ -347,16 +424,25 @@ class Extract2MDConverter {
             // We need to access the message content.
             // For simplicity, assuming it's similar to the previous structure or a direct string.
             // If it returns a more complex object, this part might need adjustment based on the exact API of webLLM.Chat.
-            const reply = await this.chatModule.generate(prompt, undefined, 0); // Or a similar method for chat completion
-            this.progressCallback({ stage: 'llm_generate_complete', message: 'LLM rewrite complete.' });
+            let replyContent = '';
+            if (this.WebLLMCreateEngine && this.chatModule && this.chatModule.chat && typeof this.chatModule.chat.completions.create === 'function') {
+                // Using MLCEngine's OpenAI-compatible API
+                const chatCompletion = await this.chatModule.chat.completions.create({
+                    messages: [{ role: "user", content: prompt }],
+                    model: model // Ensure 'model' here is the modelId used for the engine
+                });
+                if (chatCompletion.choices && chatCompletion.choices.length > 0 && chatCompletion.choices[0].message) {
+                    replyContent = chatCompletion.choices[0].message.content || '';
+                }
+            } else if (this.chatModule && typeof this.chatModule.generate === 'function') {
+                // Fallback or direct Chat.generate usage
+                replyContent = await this.chatModule.generate(prompt, undefined, 0); // progressCb and streamInterval to undefined/0
+            } else {
+                throw new Error('LLM module does not support generate or chat.completions.create');
+            }
             
-            // If reply is an object, extract the text content, e.g., reply.choices[0].message.content
-            // For now, assume 'reply' is the string or has a direct way to get string output.
-            // This might need to be:
-            // const chatCompletion = await this.chatModule.chat.completions.create({ messages: [{role: "user", content: prompt}], model: model });
-            // const reply = chatCompletion.choices[0].message.content;
-            // However, the `generate` method was used before, so let's assume it's still the primary way or has been adapted.
-            return reply;
+            this.progressCallback({ stage: 'llm_generate_complete', message: 'LLM rewrite complete.' });
+            return replyContent;
         } catch (err) {
             this.progressCallback({ stage: 'llm_generate_error', message: `LLM generation failed: ${err.message}`, error: err });
             throw new Error(`LLM generation failed: ${err.message}`);
