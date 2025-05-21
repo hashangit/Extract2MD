@@ -38,47 +38,71 @@ async function ensureDirExists(dirPath) {
   }
 }
 
-async function downloadFile(url, destPath, fileName) {
-  return new Promise((resolve, reject) => {
-    const tempFilePath = path.join(langDataPath, `_${fileName}`); // Download to a temp name
-    const fileStream = fs.createWriteStream(tempFilePath);
-    console.log(`Downloading ${fileName} from ${url}...`);
+async function downloadFile(url, destPath, fileName, redirectCount = 0) {
+  const MAX_REDIRECTS = 5;
 
-    https.get(url, (response) => {
-      if (response.statusCode !== 200) {
-        fs.unlink(tempFilePath, () => {}); // Clean up temp file
-        reject(new Error(`Failed to download ${fileName}. Status Code: ${response.statusCode}`));
+  return new Promise((resolve, reject) => {
+    if (redirectCount > MAX_REDIRECTS) {
+      reject(new Error(`Exceeded maximum redirect limit (${MAX_REDIRECTS}) for ${fileName}`));
+      return;
+    }
+
+    const tempFilePath = path.join(langDataPath, `_${fileName}`); // Download to a temp name
+    // Ensure tempFilePath is not created if the actual destPath is the same (for non-gzipped direct save)
+    // However, for consistency and cleanup, using a temp file is safer.
+    // The final rename will handle placing it correctly.
+
+    console.log(`Downloading ${fileName} from ${url} (Attempt: ${redirectCount + 1})...`);
+
+    const request = https.get(url, (response) => {
+      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        console.log(`Redirected for ${fileName} to ${response.headers.location}`);
+        // Consume response data to free up memory
+        response.resume();
+        downloadFile(response.headers.location, destPath, fileName, redirectCount + 1)
+          .then(resolve)
+          .catch(reject);
         return;
       }
 
+      if (response.statusCode !== 200) {
+        // fs.unlink(tempFilePath, () => {}); // Don't unlink if it wasn't opened yet or on redirect
+        reject(new Error(`Failed to download ${fileName}. Status Code: ${response.statusCode} from ${url}`));
+        return;
+      }
+
+      const fileStream = fs.createWriteStream(tempFilePath);
       response.pipe(fileStream);
 
       fileStream.on('finish', () => {
         fileStream.close(async (err) => {
           if (err) {
-            fs.unlink(tempFilePath, () => {}); // Clean up temp file
+            fs.unlink(tempFilePath, () => {}).catch(() => {}); // Clean up temp file, ignore error if it doesn't exist
             reject(new Error(`Error closing file stream for ${fileName}: ${err.message}`));
             return;
           }
-          // Rename from temp to final destination *after* successful download and close
           try {
+            // Ensure target directory exists before renaming
+            await ensureDirExists(path.dirname(destPath));
             await fs.promises.rename(tempFilePath, destPath);
             console.log(`Successfully downloaded and saved ${fileName} to ${destPath}`);
             resolve();
           } catch (renameError) {
-            fs.unlink(tempFilePath, () => {}); // Clean up temp file
+            fs.unlink(tempFilePath, () => {}).catch(() => {});
             reject(new Error(`Error renaming ${tempFilePath} to ${destPath}: ${renameError.message}`));
           }
         });
       });
 
       fileStream.on('error', (err) => {
-        fs.unlink(tempFilePath, () => {}); // Clean up temp file
+        fs.unlink(tempFilePath, () => {}).catch(() => {});
         reject(new Error(`Error writing file ${fileName}: ${err.message}`));
       });
-    }).on('error', (err) => {
-      fs.unlink(tempFilePath, () => {}); // Clean up temp file
-      reject(new Error(`Error downloading ${fileName}: ${err.message}`));
+    });
+
+    request.on('error', (err) => {
+      // fs.unlink(tempFilePath, () => {}).catch(() => {}); // Temp file might not exist if request itself failed early
+      reject(new Error(`Error downloading ${fileName} from ${url}: ${err.message}`));
     });
   });
 }
