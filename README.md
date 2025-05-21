@@ -133,7 +133,7 @@ Instantiate `Extract2MDConverter` with optional configuration:
 ```javascript
 const converter = new Extract2MDConverter({
     // --- Asset Path Configuration (Optional: Override if not serving from default locations) ---
-    // pdfJsWorkerSrc: '/custom/path/to/pdf.worker.min.js',
+    // pdfJsWorkerSrc: '/custom/path/to/pdf.worker.min.mjs',
     // tesseractWorkerPath: '/custom/path/to/tesseract-worker.min.js',
     // tesseractCorePath: '/custom/path/to/tesseract-core.wasm.js',
     // tesseractLangPath: '/custom/path/to/your/lang-data/', // For *additional* languages not auto-downloaded
@@ -180,7 +180,7 @@ const converter = new Extract2MDConverter({
 3.  **Default Behavior & Paths:**
     -   The library is pre-configured to locate these assets within its standard installed directory structure in `node_modules`.
     -   The main UMD bundle is `dist/assets/extract2md.umd.js`.
-        -   `pdf.worker.min.js` is expected at `../pdf.worker.min.js` (relative to the UMD bundle).
+        -   `pdf.worker.min.mjs` is expected at `../pdf.worker.min.mjs` (relative to the UMD bundle).
         -   Tesseract worker and core WASM are expected in `./` (i.e., `dist/assets/`).
         -   Downloaded Tesseract language data is expected in `./lang-data/` (i.e., `dist/assets/lang-data/`).
 
@@ -348,7 +348,7 @@ Passed when creating an `Extract2MDConverter` instance:
 
 | Option                | Type       | Default                                       | Description                                                                                                                               |
 | --------------------- | ---------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `pdfJsWorkerSrc`      | `String`   | `../pdf.worker.min.js`                        | Path to the `pdf.js` worker file, relative to the main UMD bundle (`dist/assets/`).                                                       |
+| `pdfJsWorkerSrc`      | `String`   | `../pdf.worker.min.mjs`                       | Path to the `pdf.js` worker file, relative to the main UMD bundle (`dist/assets/`).                                                       |
 | `tesseractWorkerPath` | `String`   | `./tesseract-worker.min.js`                   | Path to the Tesseract.js worker file, relative to the main UMD bundle.                                                                    |
 | `tesseractCorePath`   | `String`   | `./tesseract-core.wasm.js`                    | Path to the Tesseract.js core WebAssembly file, relative to the main UMD bundle.                                                          |
 | `tesseractLangPath`   | `String`   | `./lang-data/`                                | Path to the directory containing Tesseract language data files (`.traineddata`), relative to the main UMD bundle.                         |
