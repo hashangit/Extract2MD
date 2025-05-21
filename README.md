@@ -7,7 +7,7 @@
 <!-- [![Build Status](https://img.shields.io/travis/com/hashangit/Extract2MD.svg)](https://travis-ci.com/hashangit/Extract2MD) -->
 <!-- [![Coverage Status](https://img.shields.io/coveralls/github/hashangit/Extract2MD.svg)](https://coveralls.io/github/hashangit/Extract2MD) -->
 
-**Current Version**: 1.0.3
+**Current Version**: 1.0.4
 
 Extract2MD is a powerful and versatile client-side JavaScript library for extracting text from PDF files and converting it into Markdown. It offers multiple extraction strategies, including fast direct extraction and high-accuracy OCR, along with an optional LLM-based text rewriting feature using WebLLM.
 
