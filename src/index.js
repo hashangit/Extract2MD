@@ -304,16 +304,20 @@ class Extract2MDConverter {
         this.chatModule = new this.WebLLMChatConstructor();
         this.chatModule.modelId = modelId; 
 
-        this.chatModule.setInitProgressCallback(report => {
+        const llmInitProgressCallback = report => {
             this.progressCallback({
                 stage: 'llm_load_progress',
                 message: `LLM Loading: ${report.text}`,
-                progress: report.progress 
+                progress: report.progress
             });
-        });
+        };
 
         try {
-            await this.chatModule.reload(modelId, chatOpts);
+            const finalChatOpts = {
+                ...chatOpts,
+                initProgressCallback: llmInitProgressCallback
+            };
+            await this.chatModule.reload(modelId, finalChatOpts);
             this.llmInitialized = true;
             this.progressCallback({ stage: 'llm_init_complete', message: 'LLM initialized successfully.' });
         } catch (err) {
