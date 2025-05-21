@@ -220,7 +220,7 @@ await converter.llmRewrite(text, {
 - **@mlc-ai/web-llm**: Engine JavaScript is bundled. LLM model files are handled separately.
 
 ## Supported languages by the highAccuracyConvert()
-(Language codes are typically ISO 639-2/T or ISO 639-3. Check Tesseract.js documentation. **All language data files listed here are bundled with the package.**)
+(Language codes are typically ISO 639-2/T or ISO 639-3. Check Tesseract.js documentation.
 English - tesseractLanguage: 'eng'
 
 

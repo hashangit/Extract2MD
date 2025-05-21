@@ -8,6 +8,7 @@
   "scripts": {
     "build": "webpack",
     "prepublishOnly": "npm run build",
+    "postinstall": "node scripts/postinstall.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -41,6 +42,7 @@
   "files": [
     "dist",
     "src",
+    "scripts",
     "README.md"
   ],
   "homepage": "https://github.com/hashangit/Extract2MD#readme",

@@ -1,0 +1,15 @@
+# Assets handled by postinstall for the consumer
+dist/assets/lang-data/eng.traineddata
+dist/assets/lang-data/sin.traineddata
+
+# Source maps (development artifacts, not for consumers)
+dist/assets/*.map
+dist/*.map
+
+# IDE and OS specific files
+.vscode/
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
