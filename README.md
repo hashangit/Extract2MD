@@ -4,6 +4,8 @@
 [![NPM Version](https://img.shields.io/npm/v/extract2md.svg)](https://www.npmjs.com/package/extract2md)
 [![License](https://img.shields.io/npm/l/extract2md.svg)](https://github.com/hashangit/Extract2MD/blob/main/LICENSE)
 [![Downloads](https://img.shields.io/npm/dt/extract2md.svg)](https://www.npmjs.com/package/extract2md)
+
+[![Sponsor on Patreon](https://img.shields.io/badge/Sponsor%20on-Patreon-F96854?logo=patreon&style=flat)](https://www.patreon.com/HashanWickramasinghe)
 <!-- [![Build Status](https://img.shields.io/travis/com/hashangit/Extract2MD.svg)](https://travis-ci.com/hashangit/Extract2MD) -->
 <!-- [![Coverage Status](https://img.shields.io/coveralls/github/hashangit/Extract2MD.svg)](https://coveralls.io/github/hashangit/Extract2MD) -->
 
