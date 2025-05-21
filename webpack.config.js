@@ -47,7 +47,7 @@ export default {
         {
           from: path.resolve(__dirname, 'node_modules/tesseract.js-core/tesseract-core.wasm.js'),
           to: path.resolve(__dirname, 'dist/assets/tesseract-core.wasm.js')
-        },
+        }
       ]
     })
   ],

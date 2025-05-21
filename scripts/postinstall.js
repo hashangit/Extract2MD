@@ -14,14 +14,14 @@ const filesToDownload = [
   {
     url: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int/eng.traineddata.gz',
     fileName: 'eng.traineddata.gz',
-    destFileName: 'eng.traineddata',
+    destFileName: 'eng.traineddata.gz', // Ensure final file is named .gz but contains uncompressed data
     gzipped: true,
   },
   {
     url: 'https://github.com/tesseract-ocr/tessdata/raw/4.00/sin.traineddata',
-    fileName: 'sin.traineddata',
-    destFileName: 'sin.traineddata',
-    gzipped: false,
+    fileName: 'sin.traineddata', // Original name from URL (or how we save it initially)
+    destFileName: 'sin.traineddata.gz', // Final name Tesseract.js expects
+    gzipped: false, // Source is not gzipped, so no decompression needed
   },
 ];
 
@@ -109,32 +109,58 @@ async function downloadFile(url, destPath, fileName, redirectCount = 0) {
 
 async function decompressGzip(sourcePath, destPath) {
   return new Promise((resolve, reject) => {
-    console.log(`Decompressing ${sourcePath} to ${destPath}...`);
+    const isSameFile = sourcePath === destPath;
+    // Use a temporary file for the decompressed output, especially if decompressing in-place.
+    const tempOutputPath = isSameFile ? `${destPath}.tmp_decompress_${Date.now()}` : destPath;
+
+    console.log(`Decompressing ${sourcePath} to ${tempOutputPath}${isSameFile ? ' (will then replace original)' : ''}...`);
+
     const gzip = zlib.createGunzip();
-    const source = fs.createReadStream(sourcePath);
-    const destination = fs.createWriteStream(destPath);
+    const sourceStream = fs.createReadStream(sourcePath);
+    const destStream = fs.createWriteStream(tempOutputPath);
 
-    source.pipe(gzip).pipe(destination);
+    sourceStream.pipe(gzip).pipe(destStream);
 
-    destination.on('finish', () => {
-      destination.close(async (err) => {
-        if (err) {
-          reject(new Error(`Error closing destination stream for ${destPath}: ${err.message}`));
+    destStream.on('finish', () => {
+      destStream.close(async (closeErr) => {
+        if (closeErr) {
+          // Attempt to clean up temporary file if it exists
+          if (fs.existsSync(tempOutputPath)) {
+            await fs.promises.unlink(tempOutputPath).catch(unlinkErr => console.error(`Error unlinking temp file ${tempOutputPath} on close error:`, unlinkErr));
+          }
+          reject(new Error(`Error closing destination stream for ${tempOutputPath}: ${closeErr.message}`));
           return;
         }
         try {
-          await fs.promises.unlink(sourcePath); // Remove original .gz file
-          console.log(`Successfully decompressed and saved to ${destPath}. Original ${sourcePath} removed.`);
+          if (isSameFile) {
+            // If source and dest are the same, rename temp file to replace original sourcePath with decompressed content
+            await fs.promises.rename(tempOutputPath, destPath);
+            console.log(`Successfully decompressed and replaced ${sourcePath} with uncompressed content.`);
+          } else {
+            // If source and dest are different, the decompressed file is at destPath (which was tempOutputPath).
+            // The original gzipped sourcePath should be removed.
+            await fs.promises.unlink(sourcePath);
+            console.log(`Successfully decompressed ${sourcePath} to ${destPath}. Original ${sourcePath} removed.`);
+          }
           resolve();
-        } catch (unlinkError) {
-          reject(new Error(`Error removing original .gz file ${sourcePath}: ${unlinkError.message}`));
+        } catch (moveOrUnlinkError) {
+          // Attempt to clean up temporary file if it exists and wasn't the final destPath
+          if (fs.existsSync(tempOutputPath) && tempOutputPath !== destPath) {
+             await fs.promises.unlink(tempOutputPath).catch(unlinkErr => console.error(`Error unlinking temp file ${tempOutputPath} on finalization error:`, unlinkErr));
+          }
+          reject(new Error(`Error finalizing decompression for ${sourcePath} (to ${destPath}): ${moveOrUnlinkError.message}`));
         }
       });
     });
 
-    destination.on('error', (err) => reject(new Error(`Error writing decompressed file ${destPath}: ${err.message}`)));
-    gzip.on('error', (err) => reject(new Error(`Error decompressing ${sourcePath}: ${err.message}`)));
-    source.on('error', (err) => reject(new Error(`Error reading ${sourcePath} for decompression: ${err.message}`)));
+    destStream.on('error', async (streamErr) => {
+      if (fs.existsSync(tempOutputPath)) {
+        await fs.promises.unlink(tempOutputPath).catch(unlinkErr => console.error(`Error unlinking temp file ${tempOutputPath} on stream error:`, unlinkErr));
+      }
+      reject(new Error(`Error writing decompressed file ${tempOutputPath}: ${streamErr.message}`));
+    });
+    gzip.on('error', (gzipErr) => reject(new Error(`Error decompressing ${sourcePath}: ${gzipErr.message}`)));
+    sourceStream.on('error', (sourceErr) => reject(new Error(`Error reading ${sourcePath} for decompression: ${sourceErr.message}`)));
   });
 }
 
@@ -167,13 +193,22 @@ async function main() {
             continue;
         }
         await decompressGzip(downloadedFilePath, finalDestPath);
+      } else {
+        // Handle non-gzipped files: if downloadedFilePath is different from finalDestPath, rename.
+        // This applies if we downloaded 'lang.traineddata' but want 'lang.traineddata.gz' (containing uncompressed data).
+        if (downloadedFilePath !== finalDestPath) {
+          if (fs.existsSync(downloadedFilePath)) {
+            console.log(`Renaming non-gzipped file ${downloadedFilePath} to ${finalDestPath}...`);
+            await fs.promises.rename(downloadedFilePath, finalDestPath);
+            console.log(`Successfully renamed ${downloadedFilePath} to ${finalDestPath}.`);
+          } else {
+            console.warn(`File ${downloadedFilePath} not found for renaming to ${finalDestPath}. It might have been saved directly as ${finalDestPath} if download logic handles it, or download failed.`);
+          }
+        } else {
+          // If downloadedFilePath is the same as finalDestPath, it means the file was already saved with the correct name.
+          console.log(`Non-gzipped file ${finalDestPath} is already correctly named. No rename needed.`);
+        }
       }
-      // For non-gzipped files, downloadFile already saves to finalDestPath (via rename)
-      // if fileName and destFileName are different.
-      // If fileName and destFileName are the same for non-gzipped, downloadFile saves it directly.
-      // The current downloadFile logic renames from _fileName to fileName.
-      // For non-gzipped, if destFileName is different, we'd need an explicit rename here.
-      // However, for sin.traineddata, fileName and destFileName are the same, so it's handled.
     }
 
     console.log('Postinstall script completed successfully.');

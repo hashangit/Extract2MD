@@ -1,10 +1,11 @@
 {
   "name": "extract2md",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Client-side PDF to Markdown conversion with OCR and optional LLM rewrite. Core dependencies bundled for offline use.",
   "main": "dist/assets/extract2md.umd.js",
   "module": "src/index.js",
   "type": "module",
+  "types": "src/extract2md.d.ts",
   "scripts": {
     "build": "webpack",
     "prepublishOnly": "npm run build",
