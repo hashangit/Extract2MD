@@ -222,6 +222,7 @@ await converter.llmRewrite(text, {
 ## Supported languages by the highAccuracyConvert()
 (Language codes are typically ISO 639-2/T or ISO 639-3. Check Tesseract.js documentation.
 English - tesseractLanguage: 'eng'
+Sinhala - tesseractLanguage: 'sin'
 
 
 ## Building the Library (For Maintainers)
