@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extract2MD Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .scenario-card {
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .scenario-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+        .scenario-card.active {
+            border-color: #667eea;
+            background-color: #f8f9ff;
+        }
+        .scenario-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .scenario-tech {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .scenario-description {
+            font-size: 0.9em;
+            color: #555;
+        }
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .file-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .file-input {
+            flex: 1;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s ease;
+        }
+        .btn:hover {
+            background: #5a6fd8;
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .progress {
+            background: #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+        .progress.active {
+            display: block;
+        }
+        .progress-message {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .progress-details {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .output {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        .output.active {
+            display: block;
+        }
+        .output-header {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .output-content {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Extract2MD Enhanced Demo</h1>
+        <p>Choose your conversion scenario and upload a PDF to see the magic happen!</p>
+    </div>
+
+    <div class="scenario-grid">
+        <div class="scenario-card" data-scenario="1">
+            <div class="scenario-title">1. Quick Convert Only</div>
+            <div class="scenario-tech">Tech: PDF.js text extraction</div>
+            <div class="scenario-description">Fast conversion for PDFs with selectable text. Basic markdown formatting.</div>
+        </div>
+
+        <div class="scenario-card" data-scenario="2">
+            <div class="scenario-title">2. High Accuracy OCR Only</div>
+            <div class="scenario-tech">Tech: Tesseract.js OCR</div>
+            <div class="scenario-description">OCR extraction for scanned documents, images, and complex layouts.</div>
+        </div>
+
+        <div class="scenario-card" data-scenario="3">
+            <div class="scenario-title">3. Quick + LLM Enhancement</div>
+            <div class="scenario-tech">Tech: PDF.js + WebLLM</div>
+            <div class="scenario-description">Fast extraction with AI enhancement for better structure and clarity.</div>
+        </div>
+
+        <div class="scenario-card" data-scenario="4">
+            <div class="scenario-title">4. OCR + LLM Enhancement</div>
+            <div class="scenario-tech">Tech: Tesseract.js + WebLLM</div>
+            <div class="scenario-description">OCR extraction with AI enhancement for comprehensive results.</div>
+        </div>
+
+        <div class="scenario-card active" data-scenario="5">
+            <div class="scenario-title">5. Combined + LLM (Recommended)</div>
+            <div class="scenario-tech">Tech: PDF.js + Tesseract.js + WebLLM</div>
+            <div class="scenario-description">Best results using both extraction methods with specialized AI prompts.</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="file-input-wrapper">
+            <input type="file" class="file-input" id="pdfInput" accept=".pdf">
+            <button class="btn" id="convertBtn" onclick="convertPDF()">Convert PDF</button>
+        </div>
+        
+        <div class="info">
+            <strong>Selected Scenario:</strong> <span id="selectedScenario">5. Combined + LLM (Recommended)</span><br>
+            <strong>Note:</strong> LLM scenarios require WebGPU support and will download models on first use.
+        </div>
+    </div>
+
+    <div class="progress" id="progressDiv">
+        <div class="progress-message" id="progressMessage">Initializing...</div>
+        <div class="progress-details" id="progressDetails"></div>
+    </div>
+
+    <div class="output" id="outputDiv">
+        <div class="output-header">
+            <span>Conversion Result</span>
+            <button class="copy-btn" onclick="copyToClipboard()">Copy</button>
+        </div>
+        <div class="output-content" id="outputContent"></div>
+    </div>
+
+    <!-- Include the Extract2MD library -->
+    <script type="module">
+        // Import the bundled Extract2MD library
+        // Ensure you have run 'npm run build' first
+        // The UMD bundle exposes itself as global 'Extract2MD'
+        // No explicit import needed here if script tag is not type="module"
+        // For simplicity, we'll assume Extract2MD is globally available after including the UMD script.
+
+        // Configuration for the demo
+        // Note: Worker paths might need adjustment if defaults in the library are not relative to the bundle.
+        // However, the library's defaults seem to align with the webpack output structure.
+        window.demoConfig = {
+            // Set absolute paths for worker files from the server root
+            // as recommended in README.md for deployment.
+            pdfJsWorkerSrc: "/dist/pdf.worker.min.mjs",
+            tesseract: {
+                oem: 1,
+                psm: 8,
+                workerPath: "/dist/assets/tesseract-worker.min.js",
+                corePath: "/dist/assets/tesseract-core.wasm.js",
+                langPath: "/dist/assets/lang-data/"
+            },
+            llm: {
+                model: "Qwen3-0.6B-q4f16_1-MLC",
+                options: {
+                    temperature: 0.7,
+                    maxTokens: 4096
+                }
+            },
+            systemPrompts: {
+                singleExtraction: "Focus on preserving technical accuracy and code examples exactly as they appear in the original document.",
+                combinedExtraction: "Create comprehensive documentation by intelligently combining the best elements from both quick extraction and OCR methods. Focus on accuracy and completeness."
+            },
+            processing: {
+                splitPascalCase: false,
+                pdfRenderScale: 2.5,
+                postProcessRules: [
+                    { find: /\bAPI\b/g, replace: "API" },
+                    { find: /\bJSON\b/g, replace: "JSON" },
+                    { find: /\bHTML\b/g, replace: "HTML" },
+                    { find: /\bCSS\b/g, replace: "CSS" },
+                    { find: /\bJS\b/g, replace: "JavaScript" }
+                ]
+            },
+            progressCallback: (progress) => {
+                updateProgress(progress);
+            }
+        };
+        
+        console.log('Extract2MD Demo loaded successfully!');
+    </script>
+
+    <script>
+        let selectedScenario = 5;
+        let isConverting = false;
+        let lastResult = '';
+
+        // Scenario selection
+        document.querySelectorAll('.scenario-card').forEach(card => {
+            card.addEventListener('click', () => {
+                // Remove active class from all cards
+                document.querySelectorAll('.scenario-card').forEach(c => c.classList.remove('active'));
+                // Add active class to clicked card
+                card.classList.add('active');
+                // Update selected scenario
+                selectedScenario = parseInt(card.dataset.scenario);
+                document.getElementById('selectedScenario').textContent = card.querySelector('.scenario-title').textContent;
+            });
+        });
+
+        // Progress updates
+        function updateProgress(progress) {
+            const progressDiv = document.getElementById('progressDiv');
+            const messageEl = document.getElementById('progressMessage');
+            const detailsEl = document.getElementById('progressDetails');
+
+            progressDiv.classList.add('active');
+            messageEl.textContent = progress.message;
+
+            let details = [];
+            if (progress.currentPage && progress.totalPages) {
+                const pageProgress = Math.round((progress.currentPage / progress.totalPages) * 100);
+                details.push(`Page Progress: ${pageProgress}% (${progress.currentPage}/${progress.totalPages})`);
+            }
+            if (progress.progress !== undefined) {
+                const loadProgress = Math.round(progress.progress * 100);
+                details.push(`Loading: ${loadProgress}%`);
+            }
+            if (progress.usage) {
+                details.push(`Tokens: ${progress.usage.total_tokens || 'N/A'}`);
+            }
+
+            detailsEl.textContent = details.join(' | ');
+
+            if (progress.error) {
+                showError('Conversion Error: ' + (progress.error.message || progress.error));
+            }
+        }
+
+        // Main conversion function
+        async function convertPDF() {
+            if (isConverting) return;
+
+            const fileInput = document.getElementById('pdfInput');
+            const pdfFile = fileInput.files[0];
+
+            if (!pdfFile) {
+                showError('Please select a PDF file first.');
+                return;
+            }
+
+            isConverting = true;
+            document.getElementById('convertBtn').disabled = true;
+            document.getElementById('convertBtn').textContent = 'Converting...';
+            document.getElementById('outputDiv').classList.remove('active');
+
+            try {
+                let result;
+                
+                switch (selectedScenario) {
+                    case 1:
+                        result = await Extract2MD.Extract2MDConverter.quickConvertOnly(pdfFile, window.demoConfig);
+                        break;
+                    case 2:
+                        result = await Extract2MD.Extract2MDConverter.highAccuracyConvertOnly(pdfFile, window.demoConfig);
+                        break;
+                    case 3:
+                        result = await Extract2MD.Extract2MDConverter.quickConvertWithLLM(pdfFile, window.demoConfig);
+                        break;
+                    case 4:
+                        result = await Extract2MD.Extract2MDConverter.highAccuracyConvertWithLLM(pdfFile, window.demoConfig);
+                        break;
+                    case 5:
+                        result = await Extract2MD.Extract2MDConverter.combinedConvertWithLLM(pdfFile, window.demoConfig);
+                        break;
+                    default:
+                        throw new Error('Invalid scenario selected');
+                }
+
+                showResult(result);
+
+            } catch (error) {
+                console.error('Conversion failed:', error);
+                showError('Conversion failed: ' + error.message);
+            } finally {
+                isConverting = false;
+                document.getElementById('convertBtn').disabled = false;
+                document.getElementById('convertBtn').textContent = 'Convert PDF';
+                document.getElementById('progressDiv').classList.remove('active');
+            }
+        }
+
+        function showResult(markdown) {
+            lastResult = markdown;
+            document.getElementById('outputContent').textContent = markdown;
+            document.getElementById('outputDiv').classList.add('active');
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.querySelector('.controls').appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function copyToClipboard() {
+            if (lastResult) {
+                navigator.clipboard.writeText(lastResult).then(() => {
+                    const btn = document.querySelector('.copy-btn');
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => btn.textContent = originalText, 2000);
+                });
+            }
+        }
+
+        // Make functions globally available
+        window.convertPDF = convertPDF;
+        window.copyToClipboard = copyToClipboard;
+    </script>
+    <!-- Include the bundled Extract2MD library -->
+    <script src="../dist/assets/extract2md.umd.js"></script>
+</body>
+</html>

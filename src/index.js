@@ -1,14 +1,20 @@
 /**
- * Extract2MDConverter.js
- * A client-side JavaScript library to extract text from PDFs and convert it to Markdown.
- * Offers multiple extraction methods (quick via pdf.js, high accuracy via Tesseract.js OCR)
- * and an optional LLM-based rewrite feature using WebLLM.
+ * Extract2MD - Enhanced PDF to Markdown conversion library
+ * New API with scenario-specific methods for different use cases
  */
 
+// Import new modular components
+import Extract2MDConverter from './converters/Extract2MDConverter.js';
+import WebLLMEngine from './engines/WebLLMEngine.js';
+import OutputParser from './utils/OutputParser.js';
+import SystemPrompts from './utils/SystemPrompts.js';
+import ConfigValidator from './utils/ConfigValidator.js';
+
+// Legacy imports for backwards compatibility
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import Tesseract from 'tesseract.js';
 import { Chat as ImportedChat, CreateMLCEngine as ImportedCreateMLCEngine } from '@mlc-ai/web-llm';
-import * as webllm from '@mlc-ai/web-llm'; // Import the full module
+import * as webllm from '@mlc-ai/web-llm';
 
 const DEFAULT_PDFJS_WORKER_SRC = '../pdf.worker.min.mjs'; // Relative to dist/assets/
 const DEFAULT_TESSERACT_WORKER_PATH = './tesseract-worker.min.js'; // Relative to dist/assets/
@@ -17,7 +23,8 @@ const DEFAULT_TESSERACT_LANG_PATH = './lang-data/';             // Relative to d
 const DEFAULT_LLM_MODEL = 'Qwen3-0.6B-q4f16_1-MLC'; // Updated to match available WASM
 const DEFAULT_LLM_MODEL_LIB_URL = 'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/Qwen3-0.6B-q4f16_1-ctx4k_cs1k-webgpu.wasm';
 
-class Extract2MDConverter {
+// Legacy converter class for backwards compatibility
+class LegacyExtract2MDConverter {
     constructor(options = {}) {
         this.pdfJsWorkerSrc = options.pdfJsWorkerSrc || DEFAULT_PDFJS_WORKER_SRC;
         const pdfjsSetupLib = (typeof pdfjsLib !== 'undefined' ? pdfjsLib : (typeof window !== 'undefined' ? window.pdfjsLib : null));
@@ -99,13 +106,32 @@ class Extract2MDConverter {
     _postProcessText(text, additionalRules = []) {
         if (!text) return '';
         let cleanedText = text;
-        const rules = [...this.defaultPostProcessRules, ...this.customPostProcessRules, ...additionalRules];
+        const allRules = [...this.defaultPostProcessRules, ...this.customPostProcessRules, ...additionalRules];
 
-        for (const rule of rules) {
+        // Optimized rule application - batch similar operations
+        const unicodeReplacements = [];
+        const regexReplacements = [];
+        
+        for (const rule of allRules) {
             if (rule.find && typeof rule.replace === 'string') {
-                cleanedText = cleanedText.replace(rule.find, rule.replace);
+                if (rule.find instanceof RegExp) {
+                    regexReplacements.push(rule);
+                } else {
+                    unicodeReplacements.push(rule);
+                }
             }
         }
+        
+        // Apply unicode replacements first (typically simpler)
+        for (const rule of unicodeReplacements) {
+            cleanedText = cleanedText.replace(rule.find, rule.replace);
+        }
+        
+        // Apply regex replacements
+        for (const rule of regexReplacements) {
+            cleanedText = cleanedText.replace(rule.find, rule.replace);
+        }
+
         return cleanedText.trim();
     }
 
@@ -121,7 +147,8 @@ class Extract2MDConverter {
             if (currentParagraphCollector.length > 0) {
                 markdownOutputLines.push(currentParagraphCollector.join(' ').trim());
                 currentParagraphCollector = [];
-                markdownOutputLines.push('');
+                // Only add empty line if the next content isn't a heading or table block
+                this._addSeparatorLine(markdownOutputLines);
             }
         };
 
@@ -135,7 +162,7 @@ class Extract2MDConverter {
                     markdownOutputLines.push(potentialTableBlockLines.join(' ').trim());
                 }
                 potentialTableBlockLines = [];
-                markdownOutputLines.push('');
+                this._addSeparatorLine(markdownOutputLines);
             }
             inPotentialTableBlock = false;
         };
@@ -159,7 +186,7 @@ class Extract2MDConverter {
                 if (inPotentialTableBlock) flushPotentialTableBlock();
                 flushCurrentParagraph();
                 markdownOutputLines.push(`# ${trimmedLine}`);
-                markdownOutputLines.push('');
+                this._addSeparatorLine(markdownOutputLines);
                 if (nextLineIsBlankOrEndOfFile && inputLines[i+1] && inputLines[i + 1].trim() === '') {
                     i++; 
                 }
@@ -182,7 +209,44 @@ class Extract2MDConverter {
         if (inPotentialTableBlock) flushPotentialTableBlock();
         flushCurrentParagraph();
 
-        let finalMarkdown = markdownOutputLines.map(line => line.trimEnd()).join('\n');
+        // Optimized final cleanup - single pass to normalize excessive newlines
+        return this._normalizeMarkdownNewlines(markdownOutputLines);
+    }
+
+    /**
+     * Helper method to add separator lines only when needed
+     */
+    _addSeparatorLine(outputLines) {
+        // Only add empty line if the last line isn't already empty
+        if (outputLines.length > 0 && outputLines[outputLines.length - 1] !== '') {
+            outputLines.push('');
+        }
+    }
+
+    /**
+     * Normalize newlines in the final markdown output
+     */
+    _normalizeMarkdownNewlines(lines) {
+        // Filter out excessive empty lines while preserving structure
+        const normalizedLines = [];
+        let consecutiveEmptyLines = 0;
+        
+        for (const line of lines) {
+            if (line.trim() === '') {
+                consecutiveEmptyLines++;
+                // Allow maximum of 1 consecutive empty line
+                if (consecutiveEmptyLines <= 1) {
+                    normalizedLines.push('');
+                }
+            } else {
+                consecutiveEmptyLines = 0;
+                normalizedLines.push(line.trimEnd());
+            }
+        }
+        
+        // Join and do final cleanup
+        let finalMarkdown = normalizedLines.join('\n');
+        // Remove any remaining triple+ newlines and trim
         finalMarkdown = finalMarkdown.replace(/\n{3,}/g, '\n\n').trim();
         return finalMarkdown;
     }
@@ -261,40 +325,94 @@ class Extract2MDConverter {
         const pdfRenderScale = options.pdfRenderScale || 2.5;
 
         let worker;
+        let workerInitialized = false;
+        
         try {
             this.progressCallback({ stage: 'ocr_worker_init', message: 'Initializing Tesseract OCR worker...' });
-            worker = await Tess.createWorker(tesseractLang, 1, tesseractOpts);
-        } catch (err) {
-            this.progressCallback({ stage: 'ocr_worker_error', message: `Failed to initialize Tesseract worker: ${err.message}`, error: err });
-            throw new Error(`Failed to initialize Tesseract worker: ${err.message}`);
-        }
-        
-        const arrayBuffer = await pdfFile.arrayBuffer();
-        const pdfDoc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-        let fullTextAccumulator = '';
-        const numPages = pdfDoc.numPages;
+            
+            try {
+                // Set timeout for worker initialization
+                const workerPromise = Tess.createWorker(tesseractLang, 1, tesseractOpts);
 
-        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-            this.progressCallback({ stage: 'ocr_render_page', message: `Rendering page ${pageNum}/${numPages} for OCR...`, currentPage: pageNum, totalPages: numPages });
-            const page = await pdfDoc.getPage(pageNum);
-            const viewport = page.getViewport({ scale: pdfRenderScale });
-            
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
+                // Add timeout to prevent hanging
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Worker initialization timed out after 30 seconds')), 30000);
+                });
 
-            await page.render({ canvasContext: context, viewport: viewport }).promise;
+                worker = await Promise.race([workerPromise, timeoutPromise]);
+                workerInitialized = true;
+
+                this.progressCallback({ stage: 'ocr_worker_ready', message: 'OCR worker initialized successfully.' });
+            } catch (err) {
+                this.progressCallback({ stage: 'ocr_worker_error', message: `Failed to initialize Tesseract worker: ${err.message}`, error: err });
+                throw new Error(`Failed to initialize Tesseract worker: ${err.message}. Check if Tesseract.js files are accessible and language data is available.`);
+            }
             
-            this.progressCallback({ stage: 'ocr_recognize_page', message: `OCR processing page ${pageNum}/${numPages}...`, currentPage: pageNum, totalPages: numPages });
-            const { data: { text: ocrPageText } } = await worker.recognize(canvas);
-            fullTextAccumulator += ocrPageText + '\n';
+            const arrayBuffer = await pdfFile.arrayBuffer();
+            const pdfDoc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+            let fullTextAccumulator = '';
+            const numPages = pdfDoc.numPages;
+
+            for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                this.progressCallback({ stage: 'ocr_render_page', message: `Rendering page ${pageNum}/${numPages} for OCR...`, currentPage: pageNum, totalPages: numPages });
+                
+                const page = await pdfDoc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: pdfRenderScale });
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                try {
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    
+                    this.progressCallback({ stage: 'ocr_recognize_page', message: `OCR processing page ${pageNum}/${numPages}...`, currentPage: pageNum, totalPages: numPages });
+                    const recognition = await worker.recognize(canvas);
+                    const ocrPageText = recognition.data?.text || '';
+                    fullTextAccumulator += ocrPageText + '\n';
+                    
+                } catch (pageError) {
+                    this.progressCallback({ stage: 'ocr_page_warning', message: `Warning: Failed to process page ${pageNum}: ${pageError.message}` });
+                    console.warn(`OCR processing failed for page ${pageNum}:`, pageError);
+                    // Continue with other pages instead of failing completely
+                } finally {
+                    // Clean up canvas resources
+                    canvas.width = 0;
+                    canvas.height = 0;
+                }
+            }
             
-            canvas.width = 0; canvas.height = 0;
+            // Safely terminate worker
+            if (workerInitialized && worker) {
+                try {
+                    this.progressCallback({ stage: 'ocr_terminate_worker', message: 'Terminating Tesseract worker...' });
+                    
+                    await Promise.race([
+                        worker.terminate(),
+                        new Promise((_, reject) => {
+                            setTimeout(() => reject(new Error('Worker termination timed out')), 10000);
+                        })
+                    ]);
+                } catch (terminateError) {
+                    console.warn('Warning: Failed to properly terminate Tesseract worker:', terminateError);
+                    // Don't throw error for termination issues
+                }
+            }
+        } catch (error) {
+            // Enhanced cleanup on error
+            if (workerInitialized && worker) {
+                try {
+                    await Promise.race([
+                        worker.terminate(),
+                        new Promise((resolve) => setTimeout(resolve, 5000)) // Give up after 5 seconds
+                    ]);
+                } catch (cleanupError) {
+                    console.warn('Failed to cleanup worker after error:', cleanupError);
+                }
+            }
+            throw error;
         }
-        
-        this.progressCallback({ stage: 'ocr_terminate_worker', message: 'Terminating Tesseract worker...' });
-        await worker.terminate();
 
         this.progressCallback({ stage: 'postprocess_ocr', message: 'Post-processing OCR text...' });
         let cleanedText = this._postProcessText(fullTextAccumulator, options.postProcessRules);
@@ -460,4 +578,18 @@ class Extract2MDConverter {
     }
 }
 
+// Export new API
 export default Extract2MDConverter;
+
+// Export individual components for advanced usage
+export {
+    Extract2MDConverter,
+    WebLLMEngine,
+    OutputParser,
+    SystemPrompts,
+    ConfigValidator,
+    LegacyExtract2MDConverter
+};
+
+// Export legacy class as default for backwards compatibility
+export { LegacyExtract2MDConverter as Extract2MDConverter_Legacy };

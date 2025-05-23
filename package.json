@@ -1,16 +1,16 @@
 {
   "name": "extract2md",
-  "version": "1.0.6",
+  "version": "2.0.0",
   "description": "Client-side PDF to Markdown conversion with OCR and optional LLM rewrite. Core dependencies bundled for offline use.",
   "main": "dist/assets/extract2md.umd.js",
-  "module": "src/index.js",
+  "module": "dist/assets/extract2md.esm.js",
   "type": "module",
-  "types": "src/extract2md.d.ts",
+  "types": "dist/assets/extract2md.d.ts",
   "scripts": {
     "build": "webpack",
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/postinstall.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/simple.test.js"
   },
   "keywords": [
     "pdf",
@@ -42,9 +42,9 @@
   },
   "files": [
     "dist",
-    "src",
     "scripts",
-    "README.md"
+    "README.md",
+    "MIGRATION.md"
   ],
   "homepage": "https://github.com/hashangit/Extract2MD#readme",
   "repository": {

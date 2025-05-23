@@ -1,15 +1,23 @@
-# Assets handled by postinstall for the consumer
-dist/assets/lang-data/eng.traineddata
-dist/assets/lang-data/sin.traineddata
+# Node.js dependencies
+node_modules/
 
-# Source maps (development artifacts, not for consumers)
+# Test files
+test/
+
+# Example files
+examples/
+
+# Build configuration
+webpack.config.js
+
+# Development files
+package-lock.json
+config.example.json
+
+# Documentation
+DEPLOYMENT.md
+LICENSE
+MIGRATION.md
+
+# Source map files
 dist/assets/*.map
-dist/*.map
-
-# IDE and OS specific files
-.vscode/
-.DS_Store
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
