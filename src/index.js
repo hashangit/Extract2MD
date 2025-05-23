@@ -431,8 +431,29 @@ class Extract2MDConverter {
                     messages: [{ role: "user", content: prompt }],
                     model: model // Ensure 'model' here is the modelId used for the engine
                 });
-                if (chatCompletion.choices && chatCompletion.choices.length > 0 && chatCompletion.choices[0].message) {
-                    replyContent = chatCompletion.choices[0].message.content || '';
+                console.log("WebLLM chatCompletion:", JSON.stringify(chatCompletion, null, 2));
+                if (chatCompletion && 
+                    chatCompletion.choices && 
+                    chatCompletion.choices.length > 0 && 
+                    chatCompletion.choices[0] && 
+                    chatCompletion.choices[0].message && 
+                    typeof chatCompletion.choices[0].message.content === 'string') {
+                    replyContent = chatCompletion.choices[0].message.content;
+                } else {
+                    replyContent = '';
+                    if (!chatCompletion) {
+                        console.warn("WebLLM response error: chatCompletion object is missing or falsy.");
+                    } else if (!chatCompletion.choices || chatCompletion.choices.length === 0) {
+                        console.warn("WebLLM response error: 'choices' array is missing, empty, or invalid in chatCompletion.");
+                    } else if (!chatCompletion.choices[0]) {
+                        console.warn("WebLLM response error: The first choice object (choices[0]) is missing or falsy.");
+                    } else if (!chatCompletion.choices[0].message) {
+                        console.warn("WebLLM response error: 'message' object is missing in the first choice.");
+                    } else if (typeof chatCompletion.choices[0].message.content !== 'string') {
+                        console.warn("WebLLM response error: 'content' in message is not a string or is missing.");
+                    } else {
+                        console.warn("WebLLM response error: Unknown issue with chatCompletion structure.");
+                    }
                 }
             } else if (this.chatModule && typeof this.chatModule.generate === 'function') {
                 // Fallback or direct Chat.generate usage
