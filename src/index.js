@@ -1,14 +1,20 @@
 /**
- * Extract2MDConverter.js
- * A client-side JavaScript library to extract text from PDFs and convert it to Markdown.
- * Offers multiple extraction methods (quick via pdf.js, high accuracy via Tesseract.js OCR)
- * and an optional LLM-based rewrite feature using WebLLM.
+ * Extract2MD - Enhanced PDF to Markdown conversion library
+ * New API with scenario-specific methods for different use cases
  */
 
+// Import new modular components
+import Extract2MDConverter from './converters/Extract2MDConverter.js';
+import WebLLMEngine from './engines/WebLLMEngine.js';
+import OutputParser from './utils/OutputParser.js';
+import SystemPrompts from './utils/SystemPrompts.js';
+import ConfigValidator from './utils/ConfigValidator.js';
+
+// Legacy imports for backwards compatibility
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import Tesseract from 'tesseract.js';
 import { Chat as ImportedChat, CreateMLCEngine as ImportedCreateMLCEngine } from '@mlc-ai/web-llm';
-import * as webllm from '@mlc-ai/web-llm'; // Import the full module
+import * as webllm from '@mlc-ai/web-llm';
 
 const DEFAULT_PDFJS_WORKER_SRC = '../pdf.worker.min.mjs'; // Relative to dist/assets/
 const DEFAULT_TESSERACT_WORKER_PATH = './tesseract-worker.min.js'; // Relative to dist/assets/
@@ -17,7 +23,8 @@ const DEFAULT_TESSERACT_LANG_PATH = './lang-data/';             // Relative to d
 const DEFAULT_LLM_MODEL = 'Qwen3-0.6B-q4f16_1-MLC'; // Updated to match available WASM
 const DEFAULT_LLM_MODEL_LIB_URL = 'https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_48/Qwen3-0.6B-q4f16_1-ctx4k_cs1k-webgpu.wasm';
 
-class Extract2MDConverter {
+// Legacy converter class for backwards compatibility
+class LegacyExtract2MDConverter {
     constructor(options = {}) {
         this.pdfJsWorkerSrc = options.pdfJsWorkerSrc || DEFAULT_PDFJS_WORKER_SRC;
         const pdfjsSetupLib = (typeof pdfjsLib !== 'undefined' ? pdfjsLib : (typeof window !== 'undefined' ? window.pdfjsLib : null));
@@ -460,4 +467,18 @@ class Extract2MDConverter {
     }
 }
 
+// Export new API
 export default Extract2MDConverter;
+
+// Export individual components for advanced usage
+export {
+    Extract2MDConverter,
+    WebLLMEngine,
+    OutputParser,
+    SystemPrompts,
+    ConfigValidator,
+    LegacyExtract2MDConverter
+};
+
+// Export legacy class as default for backwards compatibility
+export { LegacyExtract2MDConverter as Extract2MDConverter_Legacy };

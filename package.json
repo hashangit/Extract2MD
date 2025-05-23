@@ -5,12 +5,12 @@
   "main": "dist/assets/extract2md.umd.js",
   "module": "src/index.js",
   "type": "module",
-  "types": "src/extract2md.d.ts",
+  "types": "src/types/index.d.ts",
   "scripts": {
     "build": "webpack",
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/postinstall.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/simple.test.js"
   },
   "keywords": [
     "pdf",
@@ -44,7 +44,10 @@
     "dist",
     "src",
     "scripts",
-    "README.md"
+    "test",
+    "examples",
+    "README.md",
+    "MIGRATION.md"
   ],
   "homepage": "https://github.com/hashangit/Extract2MD#readme",
   "repository": {
