@@ -9,6 +9,8 @@
 
 A powerful client-side JavaScript library for converting PDFs to Markdown with multiple extraction methods and optional LLM enhancement. Now with scenario-specific methods for different use cases.
 
+![Extract2MD](https://github.com/user-attachments/assets/0704e80a-54bc-4449-a495-eb944a318400)
+
 ## 🚀 Quick Start
 
 Extract2MD now offers 5 distinct scenarios for different conversion needs:
