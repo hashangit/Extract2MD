@@ -61,7 +61,7 @@ class DeploymentValidator {
             'src/index.js',
             'src/types/index.d.ts',
             'dist/assets/extract2md.umd.js',
-            'README_NEW.md',
+            'README.md',
             'MIGRATION.md',
             'DEPLOYMENT.md',
             'config.example.json'
@@ -124,7 +124,7 @@ class DeploymentValidator {
         this.log('Validating documentation...');
 
         const docFiles = {
-            'README_NEW.md': ['Installation', 'Scenarios', 'Configuration'],
+            'README.md': ['Installation', 'Scenarios', 'Configuration'],
             'MIGRATION.md': ['Legacy API', 'Migration', 'Backwards Compatibility'],
             'DEPLOYMENT.md': ['Distribution', 'Performance', 'Security']
         };

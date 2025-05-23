@@ -25,7 +25,7 @@ extract2md/
 ├── test/                         # Test files
 ├── package.json                  # Package configuration
 ├── config.example.json          # Example configuration
-├── README_NEW.md                 # Main documentation
+├── README.md                 # Main documentation
 └── MIGRATION.md                 # Migration guide
 ```
 
@@ -350,7 +350,7 @@ export default {
 ## Support and Maintenance
 
 ### Documentation
-- **API Documentation**: See `README_NEW.md`
+- **API Documentation**: See `README.md`
 - **Migration Guide**: See `MIGRATION.md`
 - **Examples**: See `examples/` directory
 
@@ -368,4 +368,4 @@ The package is distributed under the MIT License, allowing for both commercial a
 
 ---
 
-**Note**: This deployment guide is for Extract2MD v1.0.6. Check the latest documentation for updates and changes in newer versions.
+**Note**: This deployment guide is for Extract2MD v2.0.0. Check the latest documentation for updates and changes in newer versions.

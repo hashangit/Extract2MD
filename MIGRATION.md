@@ -288,7 +288,7 @@ await tests.runFullTests(pdfFile);
 ## Need Help?
 
 - Check the [examples](./examples/) folder for complete usage examples
-- See the [README_NEW.md](./README_NEW.md) for full API documentation
+- See the [README.md](./README.md) for full API documentation
 - Open an issue on GitHub if you encounter migration problems
 
 ## Timeline
