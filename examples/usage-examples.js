@@ -2,7 +2,8 @@
  * Example usage of Extract2MD with all scenarios
  */
 
-import Extract2MDConverter, { ConfigValidator } from '../src/index.js';
+// Fix import statement to match new API structure
+import { Extract2MDConverter, ConfigValidator } from '../src/index.js';
 
 // Example configurations for different scenarios
 const basicConfig = {
@@ -15,7 +16,7 @@ const basicConfig = {
 };
 
 const advancedConfig = {
-  llm: {
+  webllm: {
     model: "Qwen3-0.6B-q4f16_1-MLC",
     options: {
       temperature: 0.7,
@@ -107,7 +108,7 @@ function demonstrateConfigValidation() {
   // Valid configuration
   try {
     const validConfig = {
-      llm: {
+      webllm: {
         model: "Qwen3-0.6B-q4f16_1-MLC",
         options: { temperature: 0.8 }
       },
@@ -127,7 +128,7 @@ function demonstrateConfigValidation() {
   // Invalid configuration example
   try {
     const invalidConfig = {
-      llm: {
+      webllm: {
         options: { temperature: 5.0 } // Invalid: temperature > 2
       }
     };
@@ -145,7 +146,7 @@ function demonstrateJSONConfig() {
   console.log('=== JSON Configuration Demo ===\n');
 
   const configJson = `{
-    "llm": {
+    "webllm": {
       "model": "Qwen3-0.6B-q4f16_1-MLC",
       "options": {
         "temperature": 0.7,
@@ -167,8 +168,8 @@ function demonstrateJSONConfig() {
   try {
     const config = ConfigValidator.fromJSON(configJson);
     console.log('✅ JSON configuration loaded successfully');
-    console.log('LLM model:', config.llm.model);
-    console.log('Temperature:', config.llm.options.temperature);
+    console.log('LLM model:', config.webllm.model);
+    console.log('Temperature:', config.webllm.options.temperature);
     console.log('Custom single extraction prompt:', config.systemPrompts.singleExtraction);
     console.log('');
   } catch (error) {

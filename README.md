@@ -83,7 +83,7 @@ const config = {
   },
   
   // LLM Configuration
-  llm: {
+  webllm: {
     model: "Qwen3-0.6B-q4f16_1-MLC",
     // Optional: Custom model
     customModel: {
@@ -263,7 +263,7 @@ import Extract2MDConverter, {
 } from 'extract2md';
 
 const config: Extract2MDConfig = {
-  llm: {
+  webllm: {
     model: "Qwen3-0.6B-q4f16_1-MLC",
     options: {
       temperature: 0.7,
@@ -287,7 +287,7 @@ npm install extract2md
 
 ### CDN Usage
 ```html
-<script src="https://unpkg.com/extract2md@1.0.6/dist/assets/extract2md.umd.js"></script>
+<script src="https://unpkg.com/extract2md@2.0.0/dist/assets/extract2md.umd.js"></script>
 <script>
     // Available as global Extract2MD
     const result = await Extract2MD.Extract2MDConverter.quickConvertOnly(pdfFile);

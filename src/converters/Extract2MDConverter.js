@@ -185,8 +185,18 @@ export class Extract2MDConverter {
      * Perform quick text extraction using PDF.js
      */
     async _performQuickExtraction(pdfFile) {
+        // Enhanced input validation
         if (!(pdfFile instanceof File)) {
             throw new Error('Invalid input: pdfFile must be a File object.');
+        }
+        if (pdfFile.size === 0) {
+            throw new Error('Invalid input: PDF file is empty.');
+        }
+        if (pdfFile.size > 100 * 1024 * 1024) { // 100MB limit
+            throw new Error('Invalid input: PDF file is too large (max 100MB).');
+        }
+        if (!pdfFile.type || (!pdfFile.type.includes('pdf') && !pdfFile.name.toLowerCase().endsWith('.pdf'))) {
+            throw new Error('Invalid input: File must be a PDF document.');
         }
 
         this.progressCallback({
@@ -231,8 +241,18 @@ export class Extract2MDConverter {
      * Perform high accuracy text extraction using OCR
      */
     async _performHighAccuracyExtraction(pdfFile) {
+        // Enhanced input validation
         if (!(pdfFile instanceof File)) {
             throw new Error('Invalid input: pdfFile must be a File object.');
+        }
+        if (pdfFile.size === 0) {
+            throw new Error('Invalid input: PDF file is empty.');
+        }
+        if (pdfFile.size > 100 * 1024 * 1024) { // 100MB limit
+            throw new Error('Invalid input: PDF file is too large (max 100MB).');
+        }
+        if (!pdfFile.type || (!pdfFile.type.includes('pdf') && !pdfFile.name.toLowerCase().endsWith('.pdf'))) {
+            throw new Error('Invalid input: File must be a PDF document.');
         }
 
         this.progressCallback({
@@ -253,23 +273,44 @@ export class Extract2MDConverter {
         }
 
         let worker;
+        let workerInitialized = false;
+        
         try {
-            // Initialize Tesseract worker
+            // Initialize Tesseract worker with enhanced error handling
             this.progressCallback({
                 stage: 'ocr_worker_init',
                 message: 'Initializing OCR worker...'
             });
             
-            worker = await Tess.createWorker(
-                this.config.tesseract.language,
-                1,
-                {
-                    workerPath: this.config.tesseract.workerPath,
-                    corePath: this.config.tesseract.corePath,
-                    langPath: this.config.tesseract.langPath,
-                    ...this.config.tesseract.options
-                }
-            );
+            try {
+                // Set timeout for worker initialization
+                const workerPromise = Tess.createWorker(
+                    this.config.tesseract.language,
+                    1,
+                    {
+                        workerPath: this.config.tesseract.workerPath,
+                        corePath: this.config.tesseract.corePath,
+                        langPath: this.config.tesseract.langPath,
+                        ...this.config.tesseract.options
+                    }
+                );
+
+                // Add timeout to prevent hanging
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Worker initialization timed out after 30 seconds')), 30000);
+                });
+
+                worker = await Promise.race([workerPromise, timeoutPromise]);
+                workerInitialized = true;
+
+                this.progressCallback({
+                    stage: 'ocr_worker_ready',
+                    message: 'OCR worker initialized successfully.'
+                });
+
+            } catch (workerError) {
+                throw new Error(`Failed to initialize Tesseract worker: ${workerError.message}. Check if Tesseract.js files are accessible and language data is available.`);
+            }
 
             // Process PDF
             const arrayBuffer = await pdfFile.arrayBuffer();
@@ -293,17 +334,47 @@ export class Extract2MDConverter {
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
 
-                await page.render({ canvasContext: context, viewport: viewport }).promise;
-                
-                const { data: { text: ocrPageText } } = await worker.recognize(canvas);
-                fullText += ocrPageText + '\n';
-                
-                // Clean up canvas
-                canvas.width = 0;
-                canvas.height = 0;
+                try {
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    
+                    // OCR recognition with error handling
+                    const recognition = await worker.recognize(canvas);
+                    const ocrPageText = recognition.data?.text || '';
+                    fullText += ocrPageText + '\n';
+                    
+                } catch (pageError) {
+                    this.progressCallback({
+                        stage: 'ocr_page_warning',
+                        message: `Warning: Failed to process page ${pageNum}: ${pageError.message}`
+                    });
+                    console.warn(`OCR processing failed for page ${pageNum}:`, pageError);
+                    // Continue with other pages instead of failing completely
+                } finally {
+                    // Clean up canvas resources
+                    canvas.width = 0;
+                    canvas.height = 0;
+                }
             }
 
-            await worker.terminate();
+            // Safely terminate worker
+            if (workerInitialized && worker) {
+                try {
+                    this.progressCallback({
+                        stage: 'ocr_worker_terminate',
+                        message: 'Terminating OCR worker...'
+                    });
+                    
+                    await Promise.race([
+                        worker.terminate(),
+                        new Promise((_, reject) => {
+                            setTimeout(() => reject(new Error('Worker termination timed out')), 10000);
+                        })
+                    ]);
+                } catch (terminateError) {
+                    console.warn('Warning: Failed to properly terminate Tesseract worker:', terminateError);
+                    // Don't throw error for termination issues
+                }
+            }
             
             const cleanedText = this._postProcessText(fullText);
             
@@ -315,8 +386,16 @@ export class Extract2MDConverter {
             return cleanedText;
 
         } catch (error) {
-            if (worker) {
-                await worker.terminate();
+            // Enhanced cleanup on error
+            if (workerInitialized && worker) {
+                try {
+                    await Promise.race([
+                        worker.terminate(),
+                        new Promise((resolve) => setTimeout(resolve, 5000)) // Give up after 5 seconds
+                    ]);
+                } catch (cleanupError) {
+                    console.warn('Failed to cleanup worker after error:', cleanupError);
+                }
             }
             throw error;
         }
@@ -344,22 +423,99 @@ export class Extract2MDConverter {
     }
 
     /**
-     * Initialize WebLLM engine
+     * Check WebGPU capability and browser support
+     * @returns {Promise<Object>} WebGPU capability information
+     */
+    static async checkWebGPUCapability() {
+        const result = {
+            isSupported: false,
+            hasShaderF16: false,
+            error: null,
+            details: {}
+        };
+
+        try {
+            // Check if WebGPU is available
+            if (!navigator.gpu) {
+                result.error = 'WebGPU is not supported in this browser. Please use Chrome 113+ or Edge 113+.';
+                return result;
+            }
+
+            // Request WebGPU adapter
+            const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) {
+                result.error = 'No WebGPU adapter found. WebGPU may not be supported on this device.';
+                return result;
+            }
+
+            // Get adapter features
+            const features = Array.from(adapter.features);
+            result.hasShaderF16 = features.includes('shader-f16');
+            result.isSupported = true;
+            result.details = {
+                features,
+                limits: adapter.limits,
+                info: adapter.info
+            };
+
+            return result;
+
+        } catch (error) {
+            result.error = `WebGPU capability check failed: ${error.message}`;
+            return result;
+        }
+    }
+
+    /**
+     * Initialize WebLLM engine with WebGPU capability checks
      */
     async _initializeWebLLM() {
-        if (!this.webllmEngine) {
-            this.webllmEngine = new WebLLMEngine({
-                progressCallback: this.progressCallback,
-                defaultModel: this.config.llm.model,
-                customModelConfig: this.config.llm.customModel
+        // Check WebGPU capability before initializing LLM
+        this.progressCallback({
+            stage: 'webgpu_check_start',
+            message: 'Checking WebGPU capability for LLM processing...'
+        });
+
+        const webgpuCapability = await Extract2MDConverter.checkWebGPUCapability();
+        
+        if (!webgpuCapability.isSupported) {
+            const errorMessage = `WebGPU capability check failed: ${webgpuCapability.error}`;
+            this.progressCallback({
+                stage: 'webgpu_check_failed',
+                message: errorMessage,
+                error: webgpuCapability.error
+            });
+            throw new Error(errorMessage);
+        }
+
+        this.progressCallback({
+            stage: 'webgpu_check_success',
+            message: `WebGPU is supported. Shader F16: ${webgpuCapability.hasShaderF16 ? 'Yes' : 'No'}`
+        });
+
+        // Validate model requirements against WebGPU capabilities
+        const modelRequiresF16 = this.config.webllm.model && this.config.webllm.model.includes('f16');
+        if (modelRequiresF16 && !webgpuCapability.hasShaderF16) {
+            const warningMessage = `Warning: Model "${this.config.webllm.model}" requires shader-f16 support, but your device doesn't support it. Performance may be reduced.`;
+            this.progressCallback({
+                stage: 'webgpu_compatibility_warning',
+                message: warningMessage
             });
         }
 
-        const modelToUse = this.config.llm.customModel ? 
-                          this.config.llm.customModel.model_id : 
-                          this.config.llm.model;
+        if (!this.webllmEngine) {
+            this.webllmEngine = new WebLLMEngine({
+                progressCallback: this.progressCallback,
+                defaultModel: this.config.webllm.model,
+                customModelConfig: this.config.webllm.customModel
+            });
+        }
 
-        await this.webllmEngine.initialize(modelToUse, this.config.llm.options);
+        const modelToUse = this.config.webllm.customModel ? 
+                          this.config.webllm.customModel.model_id : 
+                          this.config.webllm.model;
+
+        await this.webllmEngine.initialize(modelToUse, this.config.webllm.options);
     }
 
     /**
@@ -372,7 +528,7 @@ export class Extract2MDConverter {
         // For models that support thinking, we could enable it
         const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
         
-        const rawOutput = await this.webllmEngine.generate(fullPrompt, this.config.llm.options);
+        const rawOutput = await this.webllmEngine.generate(fullPrompt, this.config.webllm.options);
         const cleanedOutput = this.outputParser.parse(rawOutput);
         
         return cleanedOutput;
@@ -387,7 +543,7 @@ export class Extract2MDConverter {
         
         const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
         
-        const rawOutput = await this.webllmEngine.generate(fullPrompt, this.config.llm.options);
+        const rawOutput = await this.webllmEngine.generate(fullPrompt, this.config.webllm.options);
         const cleanedOutput = this.outputParser.parse(rawOutput);
         
         return cleanedOutput;
@@ -466,7 +622,7 @@ export class Extract2MDConverter {
     }
 
     /**
-     * Post-process extracted text
+     * Post-process extracted text with optimized rule application
      */
     _postProcessText(text) {
         if (!text) return '';
@@ -496,23 +652,42 @@ export class Extract2MDConverter {
             );
         }
 
-        // Apply all rules
+        // Combine all rules for efficient processing
         const allRules = [...defaultRules, ...this.config.processing.postProcessRules];
+        
+        // Optimized rule application - batch similar operations
+        const unicodeReplacements = [];
+        const regexReplacements = [];
+        
         for (const rule of allRules) {
             if (rule.find && typeof rule.replace === 'string') {
-                cleanedText = cleanedText.replace(rule.find, rule.replace);
+                if (rule.find instanceof RegExp) {
+                    regexReplacements.push(rule);
+                } else {
+                    unicodeReplacements.push(rule);
+                }
             }
         }
+        
+        // Apply unicode replacements first (typically simpler)
+        for (const rule of unicodeReplacements) {
+            cleanedText = cleanedText.replace(rule.find, rule.replace);
+        }
+        
+        // Apply regex replacements
+        for (const rule of regexReplacements) {
+            cleanedText = cleanedText.replace(rule.find, rule.replace);
+        }
 
-        return cleanedText.replace(/\r\n/g, '\n').replace(/\n{2,}/g, '\n\n').trim();
+        // Final normalization - combine line break handling with newline normalization
+        return cleanedText.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
     }
 
     /**
-     * Convert text to markdown
+     * Convert text to markdown with optimized newline handling
      */
     _convertToMarkdown(rawText) {
-        // Implementation of markdown conversion logic
-        // (This is the same logic from the original _convertToMarkdownLogic method)
+        // Implementation of markdown conversion logic with optimized newline handling
         let markdownOutputLines = [];
         const inputLines = rawText.split(/\n/);
 
@@ -524,7 +699,8 @@ export class Extract2MDConverter {
             if (currentParagraphCollector.length > 0) {
                 markdownOutputLines.push(currentParagraphCollector.join(' ').trim());
                 currentParagraphCollector = [];
-                markdownOutputLines.push('');
+                // Only add empty line if the next content isn't a heading or table block
+                this._addSeparatorLine(markdownOutputLines);
             }
         };
 
@@ -538,7 +714,7 @@ export class Extract2MDConverter {
                     markdownOutputLines.push(potentialTableBlockLines.join(' ').trim());
                 }
                 potentialTableBlockLines = [];
-                markdownOutputLines.push('');
+                this._addSeparatorLine(markdownOutputLines);
             }
             inPotentialTableBlock = false;
         };
@@ -565,7 +741,7 @@ export class Extract2MDConverter {
                 if (inPotentialTableBlock) flushPotentialTableBlock();
                 flushCurrentParagraph();
                 markdownOutputLines.push(`# ${trimmedLine}`);
-                markdownOutputLines.push('');
+                this._addSeparatorLine(markdownOutputLines);
                 if (nextLineIsBlankOrEndOfFile && inputLines[i + 1] && inputLines[i + 1].trim() === '') {
                     i++;
                 }
@@ -588,17 +764,74 @@ export class Extract2MDConverter {
         if (inPotentialTableBlock) flushPotentialTableBlock();
         flushCurrentParagraph();
 
-        let finalMarkdown = markdownOutputLines.map(line => line.trimEnd()).join('\n');
+        // Optimized final cleanup - single pass to normalize excessive newlines
+        return this._normalizeMarkdownNewlines(markdownOutputLines);
+    }
+
+    /**
+     * Helper method to add separator lines only when needed
+     */
+    _addSeparatorLine(outputLines) {
+        // Only add empty line if the last line isn't already empty
+        if (outputLines.length > 0 && outputLines[outputLines.length - 1] !== '') {
+            outputLines.push('');
+        }
+    }
+
+    /**
+     * Normalize newlines in the final markdown output
+     */
+    _normalizeMarkdownNewlines(lines) {
+        // Filter out excessive empty lines while preserving structure
+        const normalizedLines = [];
+        let consecutiveEmptyLines = 0;
+        
+        for (const line of lines) {
+            if (line.trim() === '') {
+                consecutiveEmptyLines++;
+                // Allow maximum of 1 consecutive empty line
+                if (consecutiveEmptyLines <= 1) {
+                    normalizedLines.push('');
+                }
+            } else {
+                consecutiveEmptyLines = 0;
+                normalizedLines.push(line.trimEnd());
+            }
+        }
+        
+        // Join and do final cleanup
+        let finalMarkdown = normalizedLines.join('\n');
+        // Remove any remaining triple+ newlines and trim
         finalMarkdown = finalMarkdown.replace(/\n{3,}/g, '\n\n').trim();
         return finalMarkdown;
     }
 
     /**
-     * Cleanup resources
+     * Cleanup resources with proper error handling
      */
     async _cleanup() {
-        if (this.webllmEngine) {
-            await this.webllmEngine.cleanup();
+        try {
+            if (this.webllmEngine) {
+                this.progressCallback({
+                    stage: 'cleanup_webllm',
+                    message: 'Cleaning up WebLLM engine...'
+                });
+                await this.webllmEngine.cleanup();
+                this.webllmEngine = null;
+            }
+            
+            this.progressCallback({
+                stage: 'cleanup_complete',
+                message: 'Resource cleanup completed successfully.'
+            });
+        } catch (error) {
+            console.warn('Warning: Error during resource cleanup:', error.message);
+            this.progressCallback({
+                stage: 'cleanup_error',
+                message: `Resource cleanup warning: ${error.message}`,
+                error: error
+            });
+            // Don't throw - cleanup errors shouldn't break the application
         }
     }
 }

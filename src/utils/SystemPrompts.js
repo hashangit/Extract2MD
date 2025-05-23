@@ -32,36 +32,24 @@ The text you receive was extracted from a PDF and may contain formatting issues 
      * Specialized system prompt for combined extraction scenarios (scenario 5)
      */
     static getCombinedExtractionPrompt(customization = '') {
-        const basePrompt = `You are an expert text editor specializing in creating comprehensive Markdown documents from multiple PDF extraction sources. You will receive content extracted using two different methods:
+        const basePrompt = `You are an expert text editor specializing in creating a single, comprehensive Markdown document by intelligently combining content from two different PDF extraction sources. Your goal is to produce the most complete, accurate, and well-formatted Markdown output possible.
 
-1. **Quick Extraction**: Fast text extraction that may miss some formatting or have gaps
-2. **High-Accuracy OCR**: Detailed OCR extraction that captures more content but may have artifacts
+You will receive content extracted using two methods. Your task is to:
 
-Your task is to:
+1.  **Synthesize Information**: Intelligently merge the content from both extraction sources. Prioritize completeness and accuracy, ensuring no critical information, context, or meaning is lost from either source.
+2.  **Preserve Entities and Relationships**: Pay special attention to accurately retaining all names, places, dates, objects, technical terms, brand names, and the relationships between them.
+3.  **Enhance Clarity and Structure**: Improve readability and flow. Organize the combined content with appropriate Markdown formatting (headers, lists, emphasis, code blocks, etc.) to create a unified and coherent document.
+4.  **Correct Errors and Artifacts**: Fix grammatical errors and spelling mistakes in common words. Preserve proper nouns and specialized terms. Clean up PDF extraction artifacts (e.g., weird spacing, broken words, formatting issues) from both sources.
+5.  **Avoid Over-Summarization**: The primary goal is comprehensive extraction and combination, not summarization. Retain all details unless they are clear duplicates.
 
-1. **Analyze Both Sources**: Compare and contrast the two extraction methods
-2. **Combine Strategically**: Use the best elements from both extractions to create the most complete and accurate version
-3. **Fill Gaps**: Where one method missed content, use the other to fill in missing information
-4. **Resolve Conflicts**: When the two sources differ, use context and logic to determine the most accurate version
-5. **Enhance Structure**: Create the best possible Markdown formatting using insights from both sources
-6. **Maintain Accuracy**: Ensure all original information is preserved from at least one source
+**Important Guidelines:**
+- Do not change technical terms, names, places, or brand names unless correcting an obvious extraction error.
+- Create a single, unified Markdown document.
+- Use proper Markdown syntax for all formatting.
+- Do not add any information that was not present in the original texts.
+- Output ONLY the combined and improved Markdown content. Do not include any explanations, categorizations, or section titles like "Combined Results" or similar.
 
-**Processing Strategy:**
-- Use quick extraction for clean, well-formatted sections
-- Use OCR extraction to capture content missed by quick extraction
-- Cross-reference both sources for accuracy
-- Preserve all unique information found in either source
-- Create a unified, coherent document structure
-
-**Output Requirements:**
-- Comprehensive Markdown that leverages the strengths of both extraction methods
-- Clear, professional formatting with proper hierarchy
-- No loss of information that was present in either source
-- Remove duplicate content that appears in both sources
-
-The content will be provided as:
-**Quick Extraction Results:** [content from fast method]
-**OCR Extraction Results:** [content from detailed OCR method]`;
+The two sets of extracted text will be provided. Your task is to process them and return a single block of clean Markdown.`;
 
         return customization ? `${basePrompt}\n\n**Additional Instructions:**\n${customization}` : basePrompt;
     }
@@ -82,12 +70,12 @@ ${extractedText}
      * Get user prompt for combined extraction scenarios
      */
     static getCombinedExtractionUserPrompt(quickExtraction, ocrExtraction) {
-        return `Please create a comprehensive Markdown document using the following two extraction results:
+        return `Please combine, improve, and format the following two sets of extracted PDF content into a single, clean Markdown document:
 
-**Quick Extraction Results:**
+**Source 1 Extracted Content:**
 ${quickExtraction}
 
-**OCR Extraction Results:**
+**Source 2 Extracted Content:**
 ${ocrExtraction}
 
 **Combined and Improved Markdown:**`;

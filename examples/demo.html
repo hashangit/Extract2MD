@@ -230,13 +230,26 @@
 
     <!-- Include the Extract2MD library -->
     <script type="module">
-        import Extract2MDConverter from '../src/index.js';
-        
-        // Make available globally for the demo
-        window.Extract2MDConverter = Extract2MDConverter;
-        
+        // Import the bundled Extract2MD library
+        // Ensure you have run 'npm run build' first
+        // The UMD bundle exposes itself as global 'Extract2MD'
+        // No explicit import needed here if script tag is not type="module"
+        // For simplicity, we'll assume Extract2MD is globally available after including the UMD script.
+
         // Configuration for the demo
+        // Note: Worker paths might need adjustment if defaults in the library are not relative to the bundle.
+        // However, the library's defaults seem to align with the webpack output structure.
         window.demoConfig = {
+            // Set absolute paths for worker files from the server root
+            // as recommended in README.md for deployment.
+            pdfJsWorkerSrc: "/dist/pdf.worker.min.mjs",
+            tesseract: {
+                oem: 1,
+                psm: 8,
+                workerPath: "/dist/assets/tesseract-worker.min.js",
+                corePath: "/dist/assets/tesseract-core.wasm.js",
+                langPath: "/dist/assets/lang-data/"
+            },
             llm: {
                 model: "Qwen3-0.6B-q4f16_1-MLC",
                 options: {
@@ -336,19 +349,19 @@
                 
                 switch (selectedScenario) {
                     case 1:
-                        result = await Extract2MDConverter.quickConvertOnly(pdfFile, window.demoConfig);
+                        result = await Extract2MD.Extract2MDConverter.quickConvertOnly(pdfFile, window.demoConfig);
                         break;
                     case 2:
-                        result = await Extract2MDConverter.highAccuracyConvertOnly(pdfFile, window.demoConfig);
+                        result = await Extract2MD.Extract2MDConverter.highAccuracyConvertOnly(pdfFile, window.demoConfig);
                         break;
                     case 3:
-                        result = await Extract2MDConverter.quickConvertWithLLM(pdfFile, window.demoConfig);
+                        result = await Extract2MD.Extract2MDConverter.quickConvertWithLLM(pdfFile, window.demoConfig);
                         break;
                     case 4:
-                        result = await Extract2MDConverter.highAccuracyConvertWithLLM(pdfFile, window.demoConfig);
+                        result = await Extract2MD.Extract2MDConverter.highAccuracyConvertWithLLM(pdfFile, window.demoConfig);
                         break;
                     case 5:
-                        result = await Extract2MDConverter.combinedConvertWithLLM(pdfFile, window.demoConfig);
+                        result = await Extract2MD.Extract2MDConverter.combinedConvertWithLLM(pdfFile, window.demoConfig);
                         break;
                     default:
                         throw new Error('Invalid scenario selected');
@@ -396,5 +409,7 @@
         window.convertPDF = convertPDF;
         window.copyToClipboard = copyToClipboard;
     </script>
+    <!-- Include the bundled Extract2MD library -->
+    <script src="../dist/assets/extract2md.umd.js"></script>
 </body>
 </html>

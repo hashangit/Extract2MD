@@ -1,4 +1,4 @@
-# Deployment Documentation for Extract2MD v1.0.6
+# Deployment Documentation for Extract2MD v2.0.0
 
 This document outlines the deployment process, distribution methods, and integration guidelines for the Extract2MD package.
 
@@ -157,7 +157,7 @@ For static sites or demos:
 
             try {
                 const result = await Extract2MD.Extract2MDConverter.quickConvertOnly(file, {
-                    ocr: { language: 'eng', oem: 1, psm: 6 }
+                    tesseract: { language: 'eng', oem: 1, psm: 6 }
                 });
                 document.getElementById('output').innerHTML = `<pre>${result}</pre>`;
             } catch (error) {
@@ -281,7 +281,7 @@ function PDFConverter() {
         setLoading(true);
         try {
             const markdown = await Extract2MDConverter.quickConvertOnly(file, {
-                ocr: { language: 'eng', oem: 1, psm: 6 }
+                tesseract: { language: 'eng', oem: 1, psm: 6 }
             });
             setResult(markdown);
         } catch (error) {
@@ -334,7 +334,7 @@ export default {
             this.loading = true;
             try {
                 this.result = await Extract2MDConverter.quickConvertOnly(file, {
-                    ocr: { language: 'eng', oem: 1, psm: 6 }
+                    tesseract: { language: 'eng', oem: 1, psm: 6 }
                 });
             } catch (error) {
                 console.error('Conversion failed:', error);

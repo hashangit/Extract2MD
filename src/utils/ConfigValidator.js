@@ -22,7 +22,7 @@ export class ConfigValidator {
             },
             
             // LLM configuration
-            llm: {
+            webllm: {
                 model: 'Qwen3-0.6B-q4f16_1-MLC',
                 customModel: null,
                 options: {
@@ -60,7 +60,7 @@ export class ConfigValidator {
         
         // Validate required types and values
         this.validateTesseractConfig(normalizedConfig.tesseract);
-        this.validateLLMConfig(normalizedConfig.llm);
+        this.validateLLMConfig(normalizedConfig.webllm);
         this.validateProcessingConfig(normalizedConfig.processing);
         this.validateSystemPrompts(normalizedConfig.systemPrompts);
         
@@ -195,8 +195,17 @@ export class ConfigValidator {
 
         if (processingConfig.postProcessRules) {
             for (const rule of processingConfig.postProcessRules) {
-                if (!rule.find || typeof rule.replace !== 'string') {
-                    throw new Error('Each postProcessRule must have a "find" property and a "replace" string');
+                if (!rule || typeof rule !== 'object') {
+                    throw new Error('Each postProcessRule must be an object');
+                }
+                if (!rule.find) {
+                    throw new Error('Each postProcessRule must have a "find" property');
+                }
+                if (typeof rule.find !== 'string' && !(rule.find instanceof RegExp)) {
+                    throw new Error('Each postProcessRule "find" property must be a string or RegExp');
+                }
+                if (typeof rule.replace !== 'string') {
+                    throw new Error('Each postProcessRule must have a "replace" string property');
                 }
             }
         }
@@ -229,7 +238,7 @@ export class ConfigValidator {
         const result = { ...target };
         
         for (const key in source) {
-            if (source.hasOwnProperty(key)) {
+            if (Object.prototype.hasOwnProperty.call(source, key)) {
                 if (this.isObject(source[key]) && this.isObject(target[key])) {
                     result[key] = this.deepMerge(target[key], source[key]);
                 } else {
@@ -289,7 +298,7 @@ export class ConfigValidator {
                         options: { type: 'object', description: 'Additional Tesseract options' }
                     }
                 },
-                llm: {
+                webllm: {
                     type: 'object',
                     properties: {
                         model: { type: 'string', description: 'Model identifier' },
