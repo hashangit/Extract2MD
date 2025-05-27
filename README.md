@@ -323,6 +323,7 @@ Use lazy loading and code splitting for production deployments.
 - **[Migration Guide](./MIGRATION.md)** - Upgrade from legacy API
 - **[Deployment Guide](./DEPLOYMENT.md)** - Production deployment instructions
 - **[Examples](./examples/)** - Complete usage examples
+- **[How To Run the Demo](./examples/README.md)** - Instructions on how to run the demo
 - **[TypeScript Definitions](./src/types/index.d.ts)** - Full type definitions
 
 ## 📄 License
