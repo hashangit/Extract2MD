@@ -1,0 +1,9 @@
+node_modules
+.git
+test
+src
+scripts
+*.log
+.DS_Store
+*.md
+package*.json 
